@@ -40,7 +40,7 @@ const LandingView: React.FC<{
   <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-4 animate-in fade-in duration-700">
     <div className="mb-10 relative">
       <img 
-        src="https://images.pexels.com/photos/4443439/pexels-photo-4443439.jpeg" 
+        src="/hero.png" 
         alt="Open Refrigerator with Food" 
         className="w-48 h-48 md:w-80 md:h-80 object-cover rounded-[2.5rem] glow-effect border-4 border-white/50 shadow-2xl transition-transform duration-500"
       />
