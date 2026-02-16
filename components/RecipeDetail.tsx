@@ -150,22 +150,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
 
   const handleShare = async () => {
     const title = `Recipe: ${recipe.title}`;
-    const text = `${recipe.title}\n\n${recipe.description}\n\nShared via PURE Chef AI`;
-    const url = window.location.href;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: title,
-          text: text,
-          url: url
-        });
-        return;
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-        console.error("Native share failed, falling back to clipboard", err);
-      }
-    }
 
     const ingredientsList = recipe.ingredients.map(ing => 
       `${ing.isMissing ? '[Needs] ' : '[Have] '} ${ing.amount} ${ing.name}`
@@ -173,7 +157,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
     
     const instructions = recipe.instructions.map((s, i) => `${i + 1}. ${s}`).join('\n');
     
-    const clipboardContent = `
+    const shareContent = `
 🍳 ${recipe.title.toUpperCase()}
 ${recipe.description}
 
@@ -189,13 +173,26 @@ ${instructions}
 Shared via PURE Chef AI
 `.trim();
 
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: shareContent
+        });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        console.error("Native share failed, falling back to clipboard", err);
+      }
+    }
+
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(clipboardContent);
+        await navigator.clipboard.writeText(shareContent);
         alert('Recipe details copied to your clipboard!');
       } else {
         const textArea = document.createElement("textarea");
-        textArea.value = clipboardContent;
+        textArea.value = shareContent;
         textArea.style.position = "fixed";
         document.body.appendChild(textArea);
         textArea.focus();
