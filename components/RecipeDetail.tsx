@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import { 
   Clock, 
   Flame, 
+  ChefHat,
   ArrowLeft, 
   Printer, 
   Share2, 
@@ -236,6 +237,16 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-3xl overflow-hidden shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 mb-12">
+      <div className="print-only-logo" aria-hidden="true">
+        <div className="print-only-logo-mark">
+          <ChefHat size={14} />
+        </div>
+        <div className="print-only-logo-wordmark">
+          <span>PURE</span>
+          <span className="print-only-logo-chef">Chef</span>
+        </div>
+      </div>
+
       <div className="relative h-72 md:h-96">
         <img 
           src={recipe.imageUrl || `https://picsum.photos/seed/${recipe.id}/1200/800`} 
