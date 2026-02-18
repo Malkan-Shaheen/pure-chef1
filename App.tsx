@@ -46,11 +46,10 @@ const LandingView: React.FC<{
       />
     </div>
     <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 tracking-tight">
-      Cook with what<br />you <span className="text-blue-500">already have.</span>
+      Cook smarter with what<br />you <span className="text-blue-500">already have.</span>
     </h1>
     <p className="text-slate-600 text-lg md:text-xl max-w-2xl mb-12 leading-relaxed">
-      PURE Chef uses AI to turn your fridge ingredients into gourmet meals. 
-      Save time, reduce waste, and eat better.
+      Scan your fridge. Get real recipes. No waste.
     </p>
     <div className="flex flex-col sm:flex-row gap-4 w-full max-w-2xl">
       <button 
