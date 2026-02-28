@@ -1,9 +1,15 @@
 /**
  * PureChef API service – auth, recipes, pantry, AI
- * Uses backend at VITE_API_URL (default http://localhost:3001)
+ * Uses backend at VITE_API_URL (default http://localhost:3001/api)
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+function getApiBase(): string {
+  let url = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  if (!url.startsWith('http')) url = 'https://' + url.replace(/^\//, '');
+  if (!url.endsWith('/api')) url = url.replace(/\/?$/, '') + '/api';
+  return url;
+}
+const API_BASE = getApiBase();
 
 function getToken(): string | null {
   return localStorage.getItem('purechef_token');
