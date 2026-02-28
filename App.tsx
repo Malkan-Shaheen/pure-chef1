@@ -22,10 +22,18 @@ import {
   Coffee,
   Smile,
   Star,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import { Ingredient, Recipe, AppState, RecipeMode, RecipeEmotion, TasteProfile, FeedbackType } from './types';
-import { detectIngredientsFromImage, generateRecipes, generateRecipeImage } from './services/gemini';
+import {
+  detectIngredientsFromImage,
+  generateRecipesV2,
+  generateRecipeImage,
+  normalizeRecipe,
+} from './services/api';
+import { useAuth } from './contexts/AuthContext';
+import { AuthScreen } from './components/AuthScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { RecipeDetail } from './components/RecipeDetail';
 import { KitchenMode } from './components/KitchenMode';
@@ -349,6 +357,7 @@ const ResultsView: React.FC<{
 // --- Main App Component ---
 
 const App: React.FC = () => {
+  const { isAuthenticated, isLoading, login, signup, logout } = useAuth();
   const [appState, setAppState] = useState<AppState>('LANDING');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipeMode, setRecipeMode] = useState<RecipeMode>('STANDARD');
@@ -419,7 +428,8 @@ const App: React.FC = () => {
     try {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1]! : dataUrl;
         const detected = await detectIngredientsFromImage(base64);
         const mapped = detected.map(name => ({
           id: Math.random().toString(36).substr(2, 9),
@@ -447,13 +457,18 @@ const App: React.FC = () => {
 
     try {
       const ingredientList = ingredients.map(i => i.name);
-      const generatedRecipes = await generateRecipes(ingredientList, recipeMode, recipeEmotion, tasteProfile);
-      
+      const { recipes: rawRecipes } = await generateRecipesV2({
+        ingredients: ingredientList,
+        mode: recipeMode,
+        emotion: recipeEmotion,
+        tasteProfile,
+      });
+
       setLoadingMessage('Garnishing visual plates...');
       const enrichedRecipes = await Promise.all(
-        generatedRecipes.map(async (r) => {
-          const imageUrl = await generateRecipeImage(r.title);
-          return { ...r, imageUrl };
+        (rawRecipes || []).map(async (r: Record<string, unknown>) => {
+          const imageUrl = await generateRecipeImage(String(r.title ?? ''));
+          return normalizeRecipe({ ...r, imageUrl });
         })
       );
 
@@ -461,10 +476,18 @@ const App: React.FC = () => {
       setAppState('RESULTS');
     } catch (error) {
       console.error(error);
-      alert('Error generating recipes. Please check your API key or try again.');
+      alert('Error generating recipes. Please ensure the backend is running and try again.');
       setAppState('EDITING');
     }
   };
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading..." />;
+  }
+
+  if (!isAuthenticated) {
+    return <AuthScreen onLogin={login} onSignup={signup} />;
+  }
 
   return (
     <div className="min-h-screen">
@@ -502,7 +525,13 @@ const App: React.FC = () => {
               PURE<span className="text-blue-500">Chef</span>
             </span>
           </div>
-          {/* Navigation links removed as requested */}
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+          >
+            <LogOut size={18} />
+            <span className="text-sm font-medium">Log out</span>
+          </button>
         </nav>
       )}
 

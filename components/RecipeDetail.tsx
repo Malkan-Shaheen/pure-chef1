@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Recipe, FeedbackType, NutritionData } from '../types';
 import { jsPDF } from 'jspdf';
+import { saveRecipe } from '../services/api';
 import { 
   Clock, 
   Flame, 
@@ -19,7 +20,8 @@ import {
   CircleDot,
   Plus,
   Minus,
-  FileText
+  FileText,
+  Bookmark
 } from 'lucide-react';
 
 interface RecipeDetailProps {
@@ -31,6 +33,7 @@ interface RecipeDetailProps {
 
 export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onStartKitchen, onFeedback }) => {
   const [feedbackGiven, setFeedbackGiven] = useState<FeedbackType | null>(null);
+  const [savedToCookbook, setSavedToCookbook] = useState(false);
   
   // Use a consistent default if servings_count is missing or 0
   const initialServings = (recipe.servings_count && recipe.servings_count > 0) ? recipe.servings_count : 4;
@@ -40,6 +43,29 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
   const handlePrint = () => {
     window.focus();
     window.print();
+  };
+
+  const handleSaveToCookbook = async () => {
+    if (savedToCookbook) return;
+    try {
+      await saveRecipe({
+        title: recipe.title,
+        description: recipe.description,
+        prepTime: recipe.prepTime,
+        calories: recipe.calories,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        imageUrl: recipe.imageUrl,
+        nutrition_total: recipe.nutrition_total,
+        nutrition_per_serving: recipe.nutrition_per_serving,
+        servings_count: recipe.servings_count,
+        nutrition_source: recipe.nutrition_source,
+        is_estimated: recipe.is_estimated,
+      });
+      setSavedToCookbook(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save recipe.');
+    }
   };
 
   const buildRecipePdf = () => {
@@ -282,6 +308,20 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
             >
               <Mic size={20} />
               Kitchen Mode
+            </button>
+            <button 
+              type="button"
+              onClick={handleSaveToCookbook}
+              disabled={savedToCookbook}
+              title={savedToCookbook ? 'Saved!' : 'Save to Cookbook'}
+              className={`p-3 rounded-xl transition-colors flex items-center gap-2 ${
+                savedToCookbook 
+                  ? 'bg-green-50 text-green-600 cursor-default' 
+                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+              }`}
+            >
+              <Bookmark size={20} fill={savedToCookbook ? 'currentColor' : 'none'} />
+              <span className="hidden sm:inline font-bold text-sm">{savedToCookbook ? 'Saved!' : 'Save'}</span>
             </button>
             <button 
               type="button"
