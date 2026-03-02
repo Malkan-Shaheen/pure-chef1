@@ -29,7 +29,6 @@ import { Ingredient, Recipe, AppState, RecipeMode, RecipeEmotion, TasteProfile, 
 import {
   detectIngredientsFromImage,
   generateRecipesV2,
-  generateRecipeImage,
   normalizeRecipe,
 } from './services/api';
 import { useAuth } from './contexts/AuthContext';
@@ -462,15 +461,16 @@ const App: React.FC = () => {
         mode: recipeMode,
         emotion: recipeEmotion,
         tasteProfile,
+        skipImages: true,
       });
 
-      setLoadingMessage('Garnishing visual plates...');
-      const enrichedRecipes = await Promise.all(
-        (rawRecipes || []).map(async (r: Record<string, unknown>) => {
-          const imageUrl = await generateRecipeImage(String(r.title ?? ''));
-          return normalizeRecipe({ ...r, imageUrl });
-        })
-      );
+      // Backend returns imageUrl; never call generate-recipe-image (avoids 3 extra min)
+      const enrichedRecipes = (rawRecipes || []).map((r: Record<string, unknown>) => {
+        const imageUrl = r.imageUrl
+          ? String(r.imageUrl)
+          : `https://picsum.photos/seed/${encodeURIComponent(String(r.title || 'recipe'))}/600/600`;
+        return normalizeRecipe({ ...r, imageUrl });
+      });
 
       setRecipes(enrichedRecipes);
       setAppState('RESULTS');

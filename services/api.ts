@@ -42,6 +42,11 @@ async function request<T>(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.error || data?.message || `Request failed: ${res.status}`;
+    if (typeof msg === 'string' && msg.toLowerCase().includes('invalid token')) {
+      localStorage.removeItem('purechef_token');
+      localStorage.removeItem('purechef_user');
+      if (typeof window !== 'undefined') window.location.reload();
+    }
     throw new Error(msg);
   }
   return data as T;
@@ -89,6 +94,8 @@ export interface GenerateRecipesV2Params {
   mode?: string;
   emotion?: string;
   tasteProfile?: Record<string, unknown>;
+  /** Skip AI image generation for faster response (uses placeholders) */
+  skipImages?: boolean;
 }
 
 export async function generateRecipesV2(
@@ -103,7 +110,7 @@ export async function generateRecipesV2(
 export async function generateRecipeImage(recipeTitle: string): Promise<string> {
   const data = await request<{ success: boolean; imageUrl: string }>(
     '/ai/generate-recipe-image',
-    { method: 'POST', body: { recipeTitle } }
+    { method: 'POST', body: { title: recipeTitle } }
   );
   return data.imageUrl || '';
 }
