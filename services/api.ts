@@ -206,15 +206,52 @@ export function normalizeRecipe(r: Record<string, unknown>): {
   is_estimated: boolean;
 } {
   const num = (v: unknown): number =>
-    typeof v === 'number' ? v : typeof v === 'string' ? parseInt(String(v), 10) || 0 : 0;
-  const defNutrition = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+    typeof v === 'number'
+      ? v
+      : typeof v === 'string'
+      ? parseFloat(String(v).replace(/[^0-9.]/g, '')) || 0
+      : 0;
+
   const ing = (r.ingredients as { name?: string; amount?: string; isMissing?: boolean }[]) ?? [];
+
+  const servings = num(r.servings_count) || 4;
+  const caloriesTop = num(r.calories);
+  const proteinTop = num((r as any).protein);
+  const carbsTop = num((r as any).carbs);
+
+  // If backend didn't send structured nutrition, derive it from top-level fields
+  const hasStructured =
+    r.nutrition_total &&
+    typeof (r.nutrition_total as any).calories !== 'undefined' &&
+    r.nutrition_per_serving &&
+    typeof (r.nutrition_per_serving as any).calories !== 'undefined';
+
+  const derivedTotal = {
+    calories: caloriesTop || (servings > 0 ? caloriesTop * servings : 0),
+    protein_g: proteinTop,
+    carbs_g: carbsTop,
+    fat_g: 0,
+  };
+  const derivedPerServing = {
+    calories: servings > 0 ? Math.round(derivedTotal.calories / servings) : derivedTotal.calories,
+    protein_g: servings > 0 ? Math.round(derivedTotal.protein_g / servings) : derivedTotal.protein_g,
+    carbs_g: servings > 0 ? Math.round(derivedTotal.carbs_g / servings) : derivedTotal.carbs_g,
+    fat_g: servings > 0 ? Math.round(derivedTotal.fat_g / servings) : derivedTotal.fat_g,
+  };
+
+  const nutrition_total = hasStructured
+    ? (r.nutrition_total as any)
+    : derivedTotal;
+  const nutrition_per_serving = hasStructured
+    ? (r.nutrition_per_serving as any)
+    : derivedPerServing;
+
   return {
     id: String(r.id ?? r._id ?? ''),
     title: String(r.title ?? ''),
     description: String(r.description ?? ''),
     prepTime: String(r.prepTime ?? r.time ?? ''),
-    calories: num(r.calories),
+    calories: caloriesTop,
     ingredients: ing.map((i) => ({
       name: String(i.name ?? ''),
       amount: String(i.amount ?? ''),
@@ -222,11 +259,11 @@ export function normalizeRecipe(r: Record<string, unknown>): {
     })),
     instructions: Array.isArray(r.instructions) ? r.instructions.map(String) : [],
     imageUrl: r.imageUrl as string | undefined,
-    nutrition_total: (r.nutrition_total as Record<string, number>) ?? defNutrition,
-    nutrition_per_serving: (r.nutrition_per_serving as Record<string, number>) ?? defNutrition,
-    servings_count: num(r.servings_count) || 4,
+    nutrition_total,
+    nutrition_per_serving,
+    servings_count: servings,
     nutrition_source: String(r.nutrition_source ?? 'estimated'),
-    is_estimated: !!r.is_estimated,
+    is_estimated: true,
   };
 }
 
