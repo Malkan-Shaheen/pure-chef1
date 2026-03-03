@@ -218,6 +218,7 @@ export function normalizeRecipe(r: Record<string, unknown>): {
   const caloriesTop = num(r.calories);
   const proteinTop = num((r as any).protein);
   const carbsTop = num((r as any).carbs);
+  const fatTop = num((r as any).fat);
 
   // If backend didn't send structured nutrition, derive it from top-level fields
   const hasStructured =
@@ -230,7 +231,7 @@ export function normalizeRecipe(r: Record<string, unknown>): {
     calories: caloriesTop || (servings > 0 ? caloriesTop * servings : 0),
     protein_g: proteinTop,
     carbs_g: carbsTop,
-    fat_g: 0,
+    fat_g: fatTop,
   };
   const derivedPerServing = {
     calories: servings > 0 ? Math.round(derivedTotal.calories / servings) : derivedTotal.calories,

@@ -38,7 +38,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
   // Use a consistent default if servings_count is missing or 0
   const initialServings = (recipe.servings_count && recipe.servings_count > 0) ? recipe.servings_count : 4;
   const [servings, setServings] = useState(initialServings);
-  const [viewMode, setViewMode] = useState<'PER_SERVING' | 'TOTAL'>('PER_SERVING');
 
   const handlePrint = () => {
     window.focus();
@@ -248,7 +247,8 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
     const baseCarbs = getBase('carbs_g');
     const baseFat = getBase('fat_g');
 
-    const multiplier = viewMode === 'PER_SERVING' ? 1 : servings;
+    // Single mode: values always scale with the servings counter
+    const multiplier = servings;
 
     return {
       calories: Math.round(baseCalories * multiplier),
@@ -256,7 +256,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
       carbs_g: Math.round(baseCarbs * multiplier),
       fat_g: Math.round(baseFat * multiplier),
     };
-  }, [recipe, servings, viewMode, initialServings]);
+  }, [recipe, servings, initialServings]);
 
   const missingIngredients = recipe.ingredients.filter(ing => ing.isMissing);
   const isGapRecipe = missingIngredients.length === 1;
@@ -360,7 +360,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
               </p>
             </div>
             
-            <div className="flex flex-wrap items-center gap-4 no-print">
+              <div className="flex flex-wrap items-center gap-4 no-print">
               <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1">
                 <button 
                   type="button"
@@ -382,22 +382,9 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onSt
                 </button>
               </div>
 
-              <div className="flex bg-white border border-slate-200 rounded-xl p-1">
-                <button 
-                  type="button"
-                  onClick={() => setViewMode('PER_SERVING')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'PER_SERVING' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                >
+                <div className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow-md">
                   Per Serving
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setViewMode('TOTAL')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'TOTAL' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                >
-                  Total Recipe
-                </button>
-              </div>
+                </div>
             </div>
           </div>
 
