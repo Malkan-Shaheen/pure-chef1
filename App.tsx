@@ -421,25 +421,54 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('[UI] handleFileUpload: file selected', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
     setAppState('GENERATING');
     setLoadingMessage('Scanning your ingredients...');
 
     try {
       const reader = new FileReader();
+      const startedAt = Date.now();
+
       reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1]! : dataUrl;
-        const detected = await detectIngredientsFromImage(base64);
-        const mapped = detected.map(name => ({
-          id: Math.random().toString(36).substr(2, 9),
-          name: name.toLowerCase()
-        }));
-        setIngredients(prev => [...prev, ...mapped]);
-        setAppState('EDITING');
+        try {
+          console.log('[UI] FileReader.onload fired');
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.includes(',')
+            ? dataUrl.split(',')[1]!
+            : dataUrl;
+          console.log('[UI] Calling detectIngredientsFromImage, base64 length', base64.length);
+          const detected = await detectIngredientsFromImage(base64);
+          console.log('[UI] detectIngredientsFromImage resolved', {
+            count: detected.length,
+            ms: Date.now() - startedAt,
+          });
+          const mapped = detected.map(name => ({
+            id: Math.random().toString(36).substr(2, 9),
+            name: name.toLowerCase()
+          }));
+          setIngredients(prev => [...prev, ...mapped]);
+          setAppState('EDITING');
+        } catch (err) {
+          console.error('[UI] Error during detectIngredientsFromImage', err);
+          alert('Failed to scan image. Please try again.');
+          setAppState('LANDING');
+        }
       };
+
+      reader.onerror = (event) => {
+        console.error('[UI] FileReader.onerror', event);
+        alert('Failed to read image file. Please try again.');
+        setAppState('LANDING');
+      };
+
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error(error);
+      console.error('[UI] Unexpected error in handleFileUpload', error);
       alert('Failed to scan image. Please try again.');
       setAppState('LANDING');
     }
