@@ -15,6 +15,24 @@ function getToken(): string | null {
   return localStorage.getItem('purechef_token');
 }
 
+/** Matches backend `limitMiddleware.js` free-tier caps */
+export const FREE_DAILY_SCAN_LIMIT = 3;
+export const FREE_LIFETIME_SCAN_LIMIT = 10;
+
+export class ApiError extends Error {
+  code?: string;
+  status?: number;
+  constructor(
+    message: string,
+    opts?: { code?: string; status?: number }
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = opts?.code;
+    this.status = opts?.status;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit & { body?: unknown } = {}
@@ -47,7 +65,11 @@ async function request<T>(
       localStorage.removeItem('purechef_user');
       if (typeof window !== 'undefined') window.location.reload();
     }
-    throw new Error(msg);
+    const message = typeof msg === 'string' ? msg : String(msg);
+    throw new ApiError(message, {
+      code: typeof data?.code === 'string' ? data.code : undefined,
+      status: res.status,
+    });
   }
   return data as T;
 }
@@ -77,6 +99,20 @@ export async function login(email: string, password: string): Promise<AuthRespon
 export function logout(): void {
   localStorage.removeItem('purechef_token');
   localStorage.removeItem('purechef_user');
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string;
+  profileImage?: string;
+  isPro: boolean;
+  generationsToday: number;
+  lifetimeGenerations: number;
+}
+
+export async function getProfile(): Promise<{ success: boolean; user: UserProfile }> {
+  return request('/auth/profile');
 }
 
 // ─── AI ──────────────────────────────────────────────────────

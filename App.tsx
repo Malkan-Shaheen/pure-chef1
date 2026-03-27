@@ -30,6 +30,9 @@ import {
   detectIngredientsFromImage,
   generateRecipesV2,
   normalizeRecipe,
+  ApiError,
+  FREE_DAILY_SCAN_LIMIT,
+  FREE_LIFETIME_SCAN_LIMIT,
 } from './services/api';
 import { useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
@@ -160,6 +163,7 @@ const EditIngredientsView: React.FC<{
   setRecipeMode: (mode: RecipeMode) => void;
   recipeEmotion: RecipeEmotion;
   setRecipeEmotion: (emotion: RecipeEmotion) => void;
+  generateBlockedReason?: string | null;
 }> = ({ 
   ingredients, 
   newIngredient, 
@@ -171,7 +175,8 @@ const EditIngredientsView: React.FC<{
   recipeMode, 
   setRecipeMode,
   recipeEmotion,
-  setRecipeEmotion
+  setRecipeEmotion,
+  generateBlockedReason,
 }) => (
   <div className="max-w-2xl mx-auto py-12 px-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
     <div className="bg-white p-8 rounded-3xl shadow-lg">
@@ -233,6 +238,12 @@ const EditIngredientsView: React.FC<{
         )}
       </div>
 
+      {generateBlockedReason && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-4 flex items-start gap-2">
+          <AlertCircle size={18} className="shrink-0 mt-0.5" />
+          {generateBlockedReason}
+        </p>
+      )}
       <div className="flex gap-4">
          <button 
           onClick={onBack}
@@ -241,7 +252,7 @@ const EditIngredientsView: React.FC<{
           Back
         </button>
         <button 
-          disabled={ingredients.length === 0}
+          disabled={ingredients.length === 0 || !!generateBlockedReason}
           onClick={onGenerate}
           className="flex-1 flex items-center justify-center gap-3 bg-blue-600 disabled:opacity-50 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl shadow-xl shadow-blue-100 transition-all hover:scale-[1.02] active:scale-95"
         >
@@ -258,17 +269,25 @@ const ResultsView: React.FC<{
   onSelect: (r: Recipe) => void;
   onEdit: () => void;
   onRegenerate: () => void;
-}> = ({ recipes, onSelect, onEdit, onRegenerate }) => (
+  canRegenerate: boolean;
+  regenerateBlockedReason?: string | null;
+}> = ({ recipes, onSelect, onEdit, onRegenerate, canRegenerate, regenerateBlockedReason }) => (
   <div className="py-12 px-4 max-w-7xl mx-auto animate-in fade-in duration-500">
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
       <div>
         <h2 className="text-4xl font-bold text-slate-900 mb-2">3 Chef Recommendations</h2>
         <p className="text-slate-600 text-lg">Personalized meals based on your unique palate.</p>
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col items-end gap-2">
+        {regenerateBlockedReason && (
+          <p className="text-xs text-amber-700 max-w-md text-right">{regenerateBlockedReason}</p>
+        )}
+        <div className="flex flex-wrap gap-3">
         <button 
+          disabled={!canRegenerate}
+          title={!canRegenerate ? (regenerateBlockedReason ?? 'Scan limit reached') : undefined}
           onClick={onRegenerate}
-          className="px-8 py-4 bg-white border border-slate-100 rounded-2xl font-bold text-blue-600 hover:border-blue-200 transition-all flex items-center gap-2"
+          className="px-8 py-4 bg-white border border-slate-100 rounded-2xl font-bold text-blue-600 hover:border-blue-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RefreshCw size={18} />
           Try 3 More
@@ -279,6 +298,7 @@ const ResultsView: React.FC<{
         >
           Adjust Ingredients
         </button>
+        </div>
       </div>
     </div>
 
@@ -353,10 +373,26 @@ const ResultsView: React.FC<{
   </div>
 );
 
+// --- Free tier (aligned with backend limitMiddleware) ---
+
+function getFreeTierGenerateBlockReason(
+  u: { isPro: boolean; generationsToday: number; lifetimeGenerations: number } | null
+): string | null {
+  if (!u || u.isPro) return null;
+  if (u.lifetimeGenerations >= FREE_LIFETIME_SCAN_LIMIT) {
+    return `You've used all ${FREE_LIFETIME_SCAN_LIMIT} free scans. Upgrade to Pro for unlimited scans.`;
+  }
+  if (u.generationsToday >= FREE_DAILY_SCAN_LIMIT) {
+    return `Daily limit of ${FREE_DAILY_SCAN_LIMIT} scans reached. It resets tomorrow, or upgrade to Pro for unlimited scans.`;
+  }
+  return null;
+}
+
 // --- Main App Component ---
 
 const App: React.FC = () => {
-  const { isAuthenticated, isLoading, login, signup, logout } = useAuth();
+  const { isAuthenticated, isLoading, login, signup, logout, user, refreshProfile } = useAuth();
+  const generateBlockedReason = getFreeTierGenerateBlockReason(user);
   const [appState, setAppState] = useState<AppState>('LANDING');
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipeMode, setRecipeMode] = useState<RecipeMode>('STANDARD');
@@ -480,6 +516,12 @@ const App: React.FC = () => {
       return;
     }
 
+    const block = getFreeTierGenerateBlockReason(user);
+    if (block) {
+      alert(block);
+      return;
+    }
+
     setAppState('GENERATING');
     setLoadingMessage(`Consulting your personal palate...`);
 
@@ -503,8 +545,17 @@ const App: React.FC = () => {
 
       setRecipes(enrichedRecipes);
       setAppState('RESULTS');
+      await refreshProfile();
     } catch (error) {
       console.error(error);
+      if (error instanceof ApiError) {
+        if (error.code === 'upgrade_required_daily' || error.code === 'upgrade_required_lifetime') {
+          alert(error.message);
+          await refreshProfile();
+          setAppState('EDITING');
+          return;
+        }
+      }
       alert('Error generating recipes. Please ensure the backend is running and try again.');
       setAppState('EDITING');
     }
@@ -554,13 +605,29 @@ const App: React.FC = () => {
               PURE<span className="text-blue-500">Chef</span>
             </span>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-          >
-            <LogOut size={18} />
-            <span className="text-sm font-medium">Log out</span>
-          </button>
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-end">
+            {user?.isPro && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-full">
+                <Zap size={14} className="text-amber-600" />
+                Pro · Unlimited scans
+              </span>
+            )}
+            {user && !user.isPro && (
+              <span
+                className="text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full max-w-[min(100vw-8rem,20rem)] truncate"
+                title="Free tier: daily limit resets each calendar day; total does not reset."
+              >
+                {user.generationsToday}/{FREE_DAILY_SCAN_LIMIT} scans today · {user.lifetimeGenerations}/{FREE_LIFETIME_SCAN_LIMIT} total
+              </span>
+            )}
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            >
+              <LogOut size={18} />
+              <span className="text-sm font-medium">Log out</span>
+            </button>
+          </div>
         </nav>
       )}
 
@@ -586,6 +653,7 @@ const App: React.FC = () => {
             setRecipeMode={setRecipeMode}
             recipeEmotion={recipeEmotion}
             setRecipeEmotion={setRecipeEmotion}
+            generateBlockedReason={generateBlockedReason}
           />
         )}
         
@@ -607,6 +675,8 @@ const App: React.FC = () => {
               onSelect={setSelectedRecipe}
               onEdit={() => setAppState('EDITING')}
               onRegenerate={handleGenerate}
+              canRegenerate={!generateBlockedReason}
+              regenerateBlockedReason={generateBlockedReason}
             />
           )
         )}
